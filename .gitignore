@@ -1,0 +1,14 @@
+notebooks_local/
+
+test/
+pdfs/
+pngs/
+graphs/
+
+outputs/
+wandb/
+
+__pycache__/
+
+.DS_Store
+.vscode/

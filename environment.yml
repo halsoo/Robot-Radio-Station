@@ -1,0 +1,25 @@
+name: robot-radio-station
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12.9
+  - pytorch-cuda=12.1
+  - pytorch
+  - torchvision
+  - torchaudio
+  - ipykernel
+  - pip
+  - pip:
+    - tqdm
+    - wandb
+    - matplotlib
+    - omegaconf
+    - hydra-core
+    - numpy 
+    - pandas
+    - x-transformers
+    - scikit-learn
+    - levenshtein
