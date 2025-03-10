@@ -1,0 +1,5 @@
+net: DecoderOnly
+dim: 256
+depth: 4
+heads: 8
+dropout: 0.2

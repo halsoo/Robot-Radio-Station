@@ -1,0 +1,7 @@
+data_path: ./metadata/
+
+dataset: SMPDatasetMaker
+
+vocab:
+  name: 'NaiveVocab'
+  num_special_tokens: 2
