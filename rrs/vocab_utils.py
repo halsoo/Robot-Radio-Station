@@ -23,8 +23,8 @@ class NaiveTrackVocab():
     self.vocab_txt_fn = vocab_txt_fn
     
     self.vocab = self._load_vocab(vocab_txt_fn)
-    self.tok2idx = { tok: idx for idx, tok in enumerate(self.vocabs) }
-    self.size = len(self.vocabs)
+    self.tok2idx = { tok: idx for idx, tok in enumerate(self.vocab) }
+    self.size = len(self.vocab)
     
     self.pad_idx, self.sos_idx, self.eos_idx = [ 
       self.tok2idx[t] 
@@ -74,17 +74,10 @@ class NaiveTrackVocab():
   
   
   def __call__(self, *args, **kwargs):
-    self.encode(*args, **kwargs)
+    return self.encode(*args, **kwargs)
   
   # encode input string to list of token indices
-  def encode(self, seq) -> List[int]:
-    # split lmx string by space
-    words = (
-      seq
-        .replace('\n', '')
-        .split(' ')
-    )
-    
+  def encode(self, words:list) -> List[int]:
     # encode words to token indices
     encoded = [ self.tok2idx[w] for w in words ]
     

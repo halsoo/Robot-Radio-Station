@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from x_transformers.x_transformers import LayerIntermediates, AbsolutePositionalEmbedding
 
 from .nn import DecoderOnly
-from .sample_utils import sample
+from .sampling_utils import sample
 
 
 class AutoRegressiveWrapper(nn.Module):
@@ -27,7 +27,7 @@ class AutoRegressiveWrapper(nn.Module):
     self.vocab = vocab
     self.max_length = max_length
     
-    self.input_embbedder = nn.Embedding(vocab.size, dim)
+    self.input_embedder = nn.Embedding(vocab.size, dim)
     self.emb_dropout = nn.Dropout(dropout)
     self.pos_enc = AbsolutePositionalEmbedding(dim, self.max_length)
     
@@ -47,14 +47,13 @@ class AutoRegressiveWrapper(nn.Module):
     return next(self.parameters()).device
 
 
-  def forward(self, seq:torch.Tensor, tgt:torch.Tensor):
+  def forward(self, seq:torch.Tensor):
     emb = self.input_embedder(seq)
-    emb = self.main_tf_dropout(emb)
-    emb = emb + self.pos_enc(emb)
+    emb += self.pos_enc(emb)
     emb = self.emb_dropout(emb)
     
-    hidden = self.main_decoder(emb)
-    hidden = self.main_norm(hidden)
+    hidden = self.decoder(emb)
+    hidden = self.decoder_norm(hidden)
     
     logits = self.proj(hidden)
     
@@ -67,7 +66,7 @@ class AutoRegressiveWrapper(nn.Module):
     emb = self.emb_dropout(emb)
     
     hidden, cache = self.decoder(emb, cache=cache) # B x T x d_model
-    hidden = self.norm(hidden)
+    hidden = self.decoder_norm(hidden)
     logits = self.proj(hidden)
     
     return logits, cache
@@ -77,10 +76,6 @@ class AutoRegressiveWrapper(nn.Module):
     self, logits, total_out, 
     sampling_method=None, threshold=None, temperature=1
   ):
-    
-    if logits.ndim == 1:
-      logits = logits.unsqueeze(0) # add batch dim
-    
     sampled = sample(logits, sampling_method, threshold, temperature)
     total_out = torch.cat([total_out, sampled], dim=-1)
     

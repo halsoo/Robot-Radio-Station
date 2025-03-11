@@ -1,12 +1,10 @@
 import math
+from collections import defaultdict
 
 import torch
 import torch.nn.functional as F
-from torch.optim.lr_scheduler import _LRScheduler
 from torch.optim import Optimizer
-from collections import defaultdict
-
-from .utils import add_conti_for_single_feature
+from torch.optim.lr_scheduler import _LRScheduler
 
 
 ########################### Loss function ################################

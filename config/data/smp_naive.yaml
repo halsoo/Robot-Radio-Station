@@ -1,0 +1,7 @@
+data_path: ./metadata/smp_naive
+
+dataset: SMPDatasetMaker
+
+vocab:
+  name: 'NaiveTrackVocab'
+  num_special_tokens: 2

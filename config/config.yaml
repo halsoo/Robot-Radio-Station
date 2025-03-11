@@ -8,13 +8,13 @@ use_fp16: True
 train_params:
   device: 'cuda'
   batch_size: 8
-  num_iter: 300000 
+  num_iter: 24000000
   num_iter_per_train_log: 10
   num_iter_per_validation: 3000
   num_iter_per_inference: 30000
   num_iter_per_checkpoint: 30000
   
-  max_length: 2000
+  max_length: 30
 
   grad_clip: 1.0
 
@@ -36,6 +36,9 @@ inference_params:
     temperature: 1.0
 
 general:
+  seed: 42
+  num_workers: 4
+  prefetch_factor: 2
   debug: False
   log: False
   save_attn_output: True 

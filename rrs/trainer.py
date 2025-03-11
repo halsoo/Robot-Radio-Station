@@ -9,9 +9,9 @@ from torch.utils.data import DataLoader, Subset
 import wandb
 from tqdm.auto import tqdm
 
-from .model_zoo import DecoderOnlyRecommender
-from . import data_utils
-from .data_utils import PadCollator, SMPIRInferenceDataset
+from .model_zoo import NaiveDecoderOnlyRecommender
+from .data_utils import PadCollator, InferenceCollator
+from .data_utils import SMPInferenceDataset
 
 
 class DecoderOnlyTrainer:
@@ -48,7 +48,7 @@ class DecoderOnlyTrainer:
     
     self.device=config.train_params.device
     self.model.to(self.device)
-      
+    
     if use_fp16:
       self.use_fp16 = True
       self.scaler = torch.cuda.amp.GradScaler()
@@ -92,6 +92,8 @@ class DecoderOnlyTrainer:
       shuffle=shuffle, 
       drop_last=drop_last,
       collate_fn=collate_fn,
+      num_workers=self.config.general.num_workers,
+      prefetch_factor=self.config.general.prefetch_factor
     )
 
 
@@ -104,7 +106,7 @@ class DecoderOnlyTrainer:
       try:
         batch = next(generator)
       except StopIteration:
-        self.train_loader = self.generate_data_loader(self.train_set, shuffle=True, drop_last=False, flattened=self.flattened)
+        self.train_loader = self.generate_data_loader(self.train_set, shuffle=True, drop_last=True)
         generator = iter(self.train_loader)
         batch = next(generator)
 
@@ -113,7 +115,7 @@ class DecoderOnlyTrainer:
       _, loss_dict = self._train_by_single_batch(batch)
       loss_dict = self._rename_dict(loss_dict, 'train')
       
-      if self.make_log and i % self.num_iter_per_train_log == 0:
+      if self.log and i % self.num_iter_per_train_log == 0:
         self.wandb_run.log(loss_dict, step=i)
       
       if i % self.num_iter_per_validation == 0:
@@ -127,7 +129,7 @@ class DecoderOnlyTrainer:
           self.save_model(self.save_dir / f'best.pt')
           print(f"Best model saved at {self.save_dir / 'best.pt'}")
         
-        if self.make_log:
+        if self.log:
           self.wandb_run.log(validation_metric_dict, step=i)
         
       if self.infer and i % self.num_iter_per_inference == 0:
@@ -248,10 +250,10 @@ class DecoderOnlyTrainer:
       )
     
     # get inference loader for batch inference
-    infer_set = SMPIRInferenceDataset.from_smp_dataset(self.valid_set, self.config.inference_params.infer_length, self.config.inference_params.condition_length)
-    infer_set = Subset(self.valid_set, range(self.num_inference))
+    infer_set = SMPInferenceDataset.from_smp_dataset(self.valid_set, self.config.inference_params.infer_length, self.config.inference_params.condition_length)
+    infer_set = Subset(infer_set, range(self.num_inference))
     
-    collate_fn = PadCollator(self.vocab.pad_idx)
+    collate_fn = InferenceCollator(self.vocab.pad_idx)
     
     infer_loader = DataLoader(
       infer_set,
@@ -264,14 +266,14 @@ class DecoderOnlyTrainer:
     start_time = time.time()
     
     condition, GT = next(iter(infer_loader))
+    condition = condition.to(self.device)
     
-    condition.to(self.device)
     inferenced_output = self.model.inference(
       condition,
       self.config.inference_params.infer_length,
-      sampling_method=self.config.inferecne_params.sampling.method, 
-      threshold=self.config.inferecne_params.sampling.threshold, 
-      temperature=self.config.inferecne_params.sampling.temperature, 
+      sampling_method=self.config.inference_params.sampling.method, 
+      threshold=self.config.inference_params.sampling.threshold, 
+      temperature=self.config.inference_params.sampling.temperature, 
       manual_seed=-1
     )
     

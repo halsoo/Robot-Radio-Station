@@ -2,13 +2,16 @@ import os
 import copy
 from pathlib import Path
 from datetime import datetime
-
-import torch
+import random
 
 import wandb
 import hydra
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig, OmegaConf
+
+import numpy as np
+
+import torch
 
 from rrs import trainer
 from rrs import data_utils
@@ -21,10 +24,10 @@ get_ts = lambda: datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
 
 def generate_experiment_name(config):
   # add base hyperparameters to the experiment name
-  dataset_name = config.data.metadata_dir
+  dataset_name = config.data.data_path.split('/')[-1]
   
   net = config.nn_params.net
-  dim = config.nn_params.model_dim
+  dim = config.nn_params.dim
   depth = config.nn_params.depth
   dropout = config.nn_params.dropout
 
@@ -73,7 +76,7 @@ def prepare_trainer(config, wandb_run, save_dir):
   
   dataset = getattr(data_utils, data_config.dataset)(
     data_path=data_config.data_path,
-    max_length=config.max_length,
+    max_length=max_length,
     vocab_name=data_config.vocab.name,
     num_special_tokens=data_config.vocab.num_special_tokens,
   )
@@ -134,6 +137,11 @@ def prepare_trainer(config, wandb_run, save_dir):
 
 
 def run_train_exp(config):
+  if config.general.seed:
+    torch.manual_seed(config.general.seed)
+    np.random.seed(config.general.seed)
+    random.seed(config.general.seed)
+  
   wandb_run, save_dir = setup_log(config)
   trainer = prepare_trainer(config, wandb_run, save_dir)
   trainer.train_by_num_iter(config.train_params.num_iter)
