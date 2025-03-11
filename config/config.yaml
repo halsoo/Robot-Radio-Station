@@ -1,0 +1,46 @@
+defaults:
+  - nn_params: decoder_only
+  - data: string_quartet_flattened
+  - wandb_config: default
+
+use_fp16: True
+
+train_params:
+  device: 'cuda'
+  batch_size: 8
+  num_iter: 24000000
+  num_iter_per_train_log: 10
+  num_iter_per_validation: 3000
+  num_iter_per_inference: 30000
+  num_iter_per_checkpoint: 30000
+  
+  max_length: 30
+
+  grad_clip: 1.0
+
+  scheduler: cosineannealingwarmuprestarts #'cosineannealingwarmuprestarts', 'cosinelr', 'not-using'
+  initial_lr: 0.00001
+  decay_step_rate: 0.8 # means it will reach its lowest point at decay_step_rate * total_num_iter
+  num_steps_per_cycle: 20000
+  warmup_steps: 2000
+  max_lr: 0.000015
+  gamma: 0.6
+
+inference_params:
+  num_inference: 5
+  infer_length: 5
+  condition_length: 10
+  sampling:
+    method: top_p # "top_p", "typical", "eta", "argmax" or None
+    threshold: 1.0
+    temperature: 1.0
+
+general:
+  seed: 42
+  num_workers: 4
+  prefetch_factor: 2
+  debug: False
+  log: False
+  save_attn_output: True 
+  infer: True 
+  save_dir: 'runs/'
