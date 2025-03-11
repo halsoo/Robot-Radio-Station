@@ -121,7 +121,7 @@ class SMPDataset():
 class SMPInferenceDataset(SMPDataset):
   def __init__(
     self, 
-    data_path, # /path/to/dataset/file.csv
+    data_path, # /path/to/dataset/file.pt
     max_length:int,
     infer_length,
     condition_length,
