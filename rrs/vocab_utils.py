@@ -51,8 +51,8 @@ class NaiveTrackVocab():
   
   
   def _load_vocab(self, vocab_txt_fn:Union[Path,str]) -> List[str]:
-    with open(vocab_txt_fn, 'r') as f:
-      vocab = [ l.strip() for l in f.readlines() if l.strip() != '' ]
+    with open(vocab_txt_fn, 'r', encoding='utf-8') as f:
+      vocab = [ l.rstrip() for l in f.readlines() ]
     
     assert (
       len(vocab) == len(set(vocab)),

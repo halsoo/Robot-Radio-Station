@@ -176,6 +176,6 @@ class SMPDatasetMaker():
   def get_datasets(self):
     train_dataset = SMPDataset(self.data_path / 'train-segments.pt', self.max_length, self.vocab)
     valid_dataset = SMPDataset(self.data_path / 'valid-segments.pt', self.max_length, self.vocab)
-    # test_dataset = SMPDataset(self.data_path / 'test-segments.csv', self.max_length, self.vocab)
+    # test_dataset = SMPDataset(self.data_path / 'test-segments.pt', self.max_length, self.vocab)
     
     return train_dataset, valid_dataset, None

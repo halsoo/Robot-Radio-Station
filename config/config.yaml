@@ -18,12 +18,12 @@ train_params:
 
   grad_clip: 1.0
 
-  scheduler: cosinelr # 'cosineannealingwarmuprestarts', 'not-using'
-  initial_lr: 0.0001
+  scheduler: cosineannealingwarmuprestarts #'cosineannealingwarmuprestarts', 'cosinelr', 'not-using'
+  initial_lr: 0.00001
   decay_step_rate: 0.8 # means it will reach its lowest point at decay_step_rate * total_num_iter
   num_steps_per_cycle: 20000
   warmup_steps: 2000
-  max_lr: 0.00015
+  max_lr: 0.000015
   gamma: 0.6
 
 inference_params:
