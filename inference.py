@@ -16,7 +16,6 @@ from torch.utils.data import DataLoader
 
 from rrs.vocab_utils import NaiveTrackVocab
 from rrs.model_zoo import NaiveDecoderOnlyRecommender
-from rrs.utils import wandb_style_config_to_omega_config
 from rrs.data_utils import InferenceCollator, SMPInferenceDataset
 
 
@@ -202,13 +201,6 @@ def get_argument_parser():
     default='best',
     help="select checkpoint, 'latest', 'best', or iteration number",
   )
-  # parser.add_argument(
-  #   "--max-length",
-  #   required=False,
-  #   type=int,
-  #   default=700,
-  #   help="max length of the inference sequence",
-  # )
   
   return parser
 
