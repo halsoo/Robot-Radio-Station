@@ -77,6 +77,7 @@ class AutoRegressiveWrapper(nn.Module):
     sampling_method=None, threshold=None, temperature=1
   ):
     sampled = sample(logits, sampling_method, threshold, temperature)
+    sampled = sampled[:, -1:]
     total_out = torch.cat([total_out, sampled], dim=-1)
     
     return total_out, sampled

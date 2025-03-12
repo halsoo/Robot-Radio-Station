@@ -166,6 +166,7 @@ def inference(args, wandb_dir, model_pt_path, n_iter):
     )
     
     output = output.to(device="cpu", dtype=torch.long)
+    output = output[:, config.inference_params.condition_length+1:]
     outputs += output.tolist()
   
   # postprocess
