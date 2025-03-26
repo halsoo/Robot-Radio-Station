@@ -1,32 +1,39 @@
 # Robot Radio Station - AI Playlist Generator
 
 ## Project structure
-    - robot-radio-station/
-      - config/
-        - data/
-          - <data config>.yaml
-        - nn_params/
-          - <nn config>.yaml
-        - config.yaml
-      - rrs/ # Main codes are in here
-      - metadata/
-        - <split name>/
-          - train-segments.csv
-          - valid-segments.csv
-          - test-segments.csv
-      - notebooks/
-        - <jupyter>.ipynb
-      - notebooks_local/
-      - outputs/ (hydra stuffs)
-      - wandb/
-        - <run id>/ # see train.generate_experiment_name for run_id 
-          - checkpoints/
-            - <model ckpt>.pt
-        - debug/
-          - <debug runs>
-      - inference.py
-      - train.py
-      - environment.yml
+```
+  - robot-radio-station/
+    - config/
+      - data/
+        - <data config>.yaml
+      - nn_params/
+        - <nn config>.yaml
+      - config.yaml
+    - rrs/ # Main codes are in here
+    - metadata/
+      - <split name>/
+        - train-segments.csv
+        - valid-segments.csv
+        - test-segments.csv
+    - notebooks/
+      - <jupyter>.ipynb
+    - notebooks_local/
+    - outputs/ (hydra stuffs)
+    - wandb/
+      - <run id>/ # see train.generate_experiment_name for run_id 
+        - checkpoints/
+          - <model ckpt>.pt
+      - debug/
+        - <debug runs>
+    - inference.py
+    - train.py
+    - environment.yml 
+    - crawl_track_infos.py # search youtube for track id and duration
+    - crawl_audio_features.py # extract audio features from youtube audio using essentia library
+    - city_list.txt # available city list for NordVPN
+    - country_list.txt # available country list for NordVPN
+
+```
 
 ## Collaboration Guideline
 ### workflow

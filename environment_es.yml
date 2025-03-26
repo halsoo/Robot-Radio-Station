@@ -1,25 +1,21 @@
-name: rrs
+name: rrs-es
 channels:
   - pytorch
   - nvidia
   - conda-forge
   - defaults
 dependencies:
-  - python=3.12.9
-  - pytorch-cuda=12.1
-  - pytorch
-  - torchvision
-  - torchaudio
+  - python=3.10.8
   - ipykernel
   - pip
   - pip:
+    - numpy<2.0.0
+    - essentia
     - tqdm
     - wandb
     - matplotlib
     - omegaconf
     - hydra-core
-    - numpy 
     - pandas
-    - x-transformers
     - scikit-learn
     - yt-dlp

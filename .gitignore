@@ -1,4 +1,6 @@
 notebooks_local/
+data/
+tmp/
 
 test/
 pdfs/
@@ -12,3 +14,5 @@ __pycache__/
 
 .DS_Store
 .vscode/
+
+youtube_cookies.txt
