@@ -159,7 +159,10 @@ def download_yt_audio(yt_id):
   }
     
   with YoutubeDL(ydl_opts) as ydl:
-    info = ydl.extract_info(yt_url, download=True)
+    info = ydl.extract_info(yt_url, download=False)
+    if info.get('is_live ', False) or info.get('was_live', False):
+      return None
+    _ = ydl.download([yt_url])
   
   downloaded_file = TMP / f"{yt_id}.mp3"
   
@@ -220,6 +223,9 @@ def main(csv_file, start_idx):
     while retry_cnt < 3:
       try:
         downloaded_file = download_yt_audio(yt_id)
+        if downloaded_file is None:
+          break
+        
         feature_dict = extract_audio_features(str(downloaded_file))
         
         downloaded_file.unlink(missing_ok=True) # remove temp file
