@@ -179,3 +179,44 @@ class SMPDatasetMaker():
     # test_dataset = SMPDataset(self.data_path / 'test-segments.pt', self.max_length, self.vocab)
     
     return train_dataset, valid_dataset, None
+
+
+
+class SMPClusterDataset():
+  def __init__(
+    self, 
+    data_path, # /path/to/dataset/file.pt
+    max_length:int,
+    mask_length:int,
+    vocab:vocab_utils.ClusterVocab,
+  ):
+    self.data_path = data_path
+    self.max_length = max_length
+    self.vocab = vocab
+    
+    self.data = self._load_data()
+  
+  
+  def _load_data(self) -> torch.Tensor:
+    return torch.load(self.data_path)
+  
+  
+  def __len__(self) -> int:
+    return len(self.data)
+  
+  
+  def __getitem__(self, idx):
+    seq = self.data[idx] # seq: list of dict containing track infos
+    
+    seq = self.vocab(seq)
+    seq = [self.vocab.sos_idx] + seq + [self.vocab.eos_idx]
+    
+    if len(seq) > self.max_length: # in this case, we sample random subsequence
+      seq_len = len(seq)
+      start_idx = random.randint(0, seq_len - self.max_length)
+      seq = seq[start_idx:start_idx+self.max_length]
+      
+      if start_idx > 0:
+        seq = [self.vocab.sos_idx] + seq
+    
+    return seq[:-1], seq[1:]
