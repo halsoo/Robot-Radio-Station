@@ -14,7 +14,8 @@ import numpy as np
 import torch
 
 from rrs import trainer
-from rrs import data_utils
+from rrs import data_utils 
+from rrs import vocab_utils
 from rrs import model_zoo
 from rrs import train_utils
 
@@ -76,18 +77,25 @@ def prepare_trainer(config, wandb_run, save_dir):
   
   if data_config.vocab.name == 'ClusterVocab':
     track_to_cluster = torch.load('./data/track_to_cluster.pt')
-    cluster_to_track = torch.load('./data/cluster_to_track.pt')
-    vocab = getattr(data_utils, data_config.vocab.name)(
+    cluster_to_track = torch.load('./data/cluster_to_tracks.pt')
+    vocab = getattr(vocab_utils, data_config.vocab.name)(
       track_to_cluster,
       cluster_to_track,
     )
+    dataset = getattr(data_utils, data_config.dataset)(
+      data_path=data_config.data_path,
+      max_length=max_length,
+      context_length=data_config.context_length,
+      vocab=vocab,
+    )
   
-  dataset = getattr(data_utils, data_config.dataset)(
-    data_path=data_config.data_path,
-    max_length=max_length,
-    vocab_name=data_config.vocab.name,
-    num_special_tokens=data_config.vocab.num_special_tokens,
-  )
+  else:
+    dataset = getattr(data_utils, data_config.dataset)(
+      data_path=data_config.data_path,
+      max_length=max_length,
+      vocab_name=data_config.vocab.name,
+      num_special_tokens=data_config.vocab.num_special_tokens,
+    )
   
   trainset, validset, _ = dataset.get_datasets()
   
@@ -108,7 +116,7 @@ def prepare_trainer(config, wandb_run, save_dir):
     wandb_run.log({'nn_total_params': total_params})
   
   # get loss function
-  loss_fn = train_utils.CrossEntropyLoss(dataset.vocab.pad_idx)
+  loss_fn = train_utils.CrossEntropyLoss(0)
   
   # get optimizer and scheduler
   optimizer = torch.optim.AdamW(model.parameters(), lr=config.train_params.initial_lr, betas=(0.9, 0.95), eps=1e-08, weight_decay=0.01)

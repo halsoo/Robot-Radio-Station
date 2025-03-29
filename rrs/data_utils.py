@@ -194,8 +194,8 @@ class SMPClusterDataset():
     self.data_path = data_path
     self.max_length = max_length
     self.context_length = context_length
-    self.training = training
     self.vocab = vocab
+    self.training = training
     
     self.data = self._load_data()
   
@@ -209,32 +209,40 @@ class SMPClusterDataset():
   
   
   def __getitem__(self, idx):
-    pl = self.data[idx] # seq: list of dict containing track infos
-    seq = [ t['track_uri'] for t in pl['tracks'] ]
+    seq = self.data[idx]['tracks'][:]
+    seq = [ t['track_uri'] for t in seq ]
     
     if len(seq) > self.max_length: # in this case, we sample random subsequence
       seq_len = len(seq)
       start_idx = random.randint(0, seq_len - self.max_length)
-      seq = seq[start_idx:start_idx+self.max_length+1]
+      seq = seq[start_idx:start_idx+self.max_length]
     
-    condition = seq[:self.context_length]
     condition = [
-      [ self.vocab.track_to_cluster(c), self.vocab.track_to_position(c) ] 
-      for c in condition
+      [ self.vocab.get_cluster_idx(c), self.vocab.get_position_in_cluster(c) ] 
+      for c in seq[:self.context_length]
     ]
-    condition = torch.tensor(condition, dtype=torch.long) # T, 2
     
-    gt = seq[self.context_length:]
+    gt_seq = seq[self.context_length:]
     if self.training:
-      gt = [gt[0]] # T, 1
+      gt_seq = random.sample(gt_seq, k=1)
+      # gt_seq = [gt_seq[0]]
     
     gt = [
-      [ self.vocab.track_to_cluster(t), self.vocab.track_to_position(t) ] 
-      for t in gt
+      [ self.vocab.get_cluster_idx(t), self.vocab.get_position_in_cluster(t) ] 
+      for t in gt_seq
     ]
-    gt = torch.tensor(gt, dtype=torch.long)
     
     return condition, gt
+
+
+
+def safe_collate(batch):
+  condition, gt = zip(*batch)
+  
+  condition = torch.stack([ torch.tensor(c, dtype=torch.long) for c in condition ])
+  gt = torch.stack([ torch.tensor(g, dtype=torch.long) for g in gt ])
+  
+  return condition, gt
 
 
 
@@ -243,16 +251,18 @@ class SMPClusterDatasetMaker():
     self, 
     data_path:Union[str, Path],
     max_length:int,
+    context_length:int,
     vocab,
     **kwargs,
   ):
     self.data_path = Path(data_path)
     self.max_length = max_length
+    self.context_length = context_length
     self.vocab = vocab
   
   def get_datasets(self):
-    train_dataset = SMPDataset(self.data_path / 'train-segments.pt', self.max_length, self.vocab)
-    valid_dataset = SMPDataset(self.data_path / 'valid-segments.pt', self.max_length, self.vocab, training=False)
+    train_dataset = SMPClusterDataset(self.data_path / 'train-segments.pt', self.max_length, self.context_length, self.vocab)
+    valid_dataset = SMPClusterDataset(self.data_path / 'valid-segments.pt', self.max_length, self.context_length, self.vocab, training=False)
     # test_dataset = SMPDataset(self.data_path / 'test-segments.pt', self.max_length, self.vocab)
     
     return train_dataset, valid_dataset, None

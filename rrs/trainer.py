@@ -11,7 +11,7 @@ import wandb
 from tqdm.auto import tqdm
 
 from .model_zoo import NaiveDecoderOnlyRecommender
-from .data_utils import PadCollator, InferenceCollator
+from .data_utils import PadCollator, InferenceCollator, safe_collate
 from .data_utils import SMPInferenceDataset
 
 
@@ -352,8 +352,8 @@ class ClusterEncoderTrainer:
     self.wandb_run = wandb_run
     
     self.infer_table = None
-    if self.wandb_run and self.log and self.infer:
-      self.infer_table = wandb.Table(columns=['n_iter', 'condition', 'GT', 'predictions'])
+    # if self.wandb_run and self.log and self.infer:
+    #   self.infer_table = wandb.Table(columns=['n_iter', 'condition', 'GT', 'predictions'])
     
     self.training_loss = []
     
@@ -374,6 +374,7 @@ class ClusterEncoderTrainer:
       batch_size=self.batch_size, 
       shuffle=shuffle, 
       drop_last=drop_last,
+      collate_fn=safe_collate,
       num_workers=self.config.general.num_workers,
       prefetch_factor=self.config.general.prefetch_factor
     )
@@ -460,8 +461,12 @@ class ClusterEncoderTrainer:
     
     if self.use_fp16:
       with torch.cuda.amp.autocast(dtype=torch.float16):
-        logits = self.model(seq)
-        loss = self.loss_fn(logits, tgt)
+        cluster_logits, track_emb = self.model(seq)
+        cluster_loss = F.cross_entropy(cluster_logits, tgt[:, 0, 0])
+        
+        target_embedding = self.model.position_in_cluster_embedding(tgt[:,0, 1].unsqueeze(-1))
+        track_similarity_loss = 1.0 - F.cosine_similarity(track_emb, target_embedding).mean()
+        loss = cluster_loss + track_similarity_loss
 
     else:
       cluster_logits, track_emb = self.model(seq)
@@ -481,7 +486,7 @@ class ClusterEncoderTrainer:
     
     validation_loss = loss.item()
     
-    return validation_loss, batch.shape[0], 1, loss_dict
+    return validation_loss, batch[0].shape[0], 1, loss_dict
 
 
   @torch.inference_mode()
@@ -518,34 +523,39 @@ class ClusterEncoderTrainer:
     infer_len = self.config.inference_params.infer_length
     infer_set = Subset(self.valid_set, range(infer_len))
     
-    infer_loader = DataLoader(
-      infer_set,
-      batch_size=infer_len, 
-      shuffle=False, 
-      drop_last=False,
-    )
-    
     start_time = time.time()
     
-    condition, gt = next(iter(infer_loader))
-    condition = condition.to(self.device)
+    total_pred = []
+    total_gt = []
     
-    predictions = self.model.inference(
-      condition=condition,
-      infer_len=infer_len,
-      cluster_top_k=10,
-      track_top_k=10
-    )
-    
+    for i in range(infer_len):
+      cond, gt = infer_set[i]
+      
+      predictions = self.model.inference(
+        condition=torch.tensor(cond).unsqueeze(0).to(self.device),
+        infer_len=infer_len,
+        cluster_top_k=10,
+        track_top_k=10
+      )
+      total_pred.append(predictions)
+      
     print(f"Inference: {n_iter}th iter: Time: {time.time() - start_time:.4f}")
-    
-    predictions = predictions.detach().cpu().numpy().tolist()
 
+    
     total_hit_count = 0
     total_hit_rate = 0.0
     
-    for i, (pred, gt) in enumerate(zip(predictions, gt)):
-      hit_cnt = len(set(pred) & gt)
+    for pred, gt in zip(total_pred, total_gt):
+      pred = set([
+        uri
+        for uri, _ in pred
+      ])
+      gt = set([
+        self.vocab.cluster_to_tracks[cluster][pos]
+        for cluster, pos in gt
+      ])
+      
+      hit_cnt = len(pred & gt)
       hit_rate = hit_cnt / infer_len
       
       total_hit_count += hit_cnt
@@ -554,8 +564,8 @@ class ClusterEncoderTrainer:
     macro_hit_rate = total_hit_rate / len(predictions)
     micro_hit_rate = total_hit_count / (len(predictions) * infer_len)
     
-    wandb.log({
-      'valid.macro_hit_rate': macro_hit_rate,
-      'valid.micro_hit_rate': micro_hit_rate,
-      'valid.inference_time': time.time() - start_time
-    })
+    if self.wandb_run and self.log:
+      self.wandb_run.log({
+        'valid.macro_hit_rate': macro_hit_rate,
+        'valid.micro_hit_rate': micro_hit_rate,
+      })

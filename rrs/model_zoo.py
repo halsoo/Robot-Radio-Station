@@ -190,7 +190,7 @@ class FeatureClusterRecommender(nn.Module):
     self.max_length = max_length
     
     self.cluster_embedding = nn.Embedding(self.vocab.num_clusters, dim//2)
-    self.position_in_cluster_embedding = nn.Embedding(self.vocab.max_positions, dim//2)
+    self.position_in_cluster_embedding = nn.Embedding(self.vocab.max_position, dim//2)
     self.pos_emb = AbsolutePositionalEmbedding(dim, self.max_length)
     self.emb_dropout = nn.Dropout(dropout)
     
@@ -211,7 +211,7 @@ class FeatureClusterRecommender(nn.Module):
       nn.LayerNorm(dim),
       nn.ReLU(),
       nn.Dropout(dropout),
-      nn.Linear(dim, self.num_clusters)
+      nn.Linear(dim, self.vocab.num_clusters)
     )
     
     # in-cluster prediction
@@ -220,7 +220,7 @@ class FeatureClusterRecommender(nn.Module):
       nn.LayerNorm(dim),
       nn.ReLU(),
       nn.Dropout(dropout),
-      nn.Linear(dim, dim)
+      nn.Linear(dim, dim//2)
     )
 
 
@@ -248,7 +248,7 @@ class FeatureClusterRecommender(nn.Module):
     context = hidden[:, -1, :] # N, d
     
     cluster_logit = self.cluster_predictor(context) # N, num_clusters
-    track_embedding = self.track_predictor(context) # N, d
+    track_embedding = self.track_predictor(context) # N, d//2
     
     return cluster_logit, track_embedding
   
@@ -256,7 +256,7 @@ class FeatureClusterRecommender(nn.Module):
   @torch.inference_mode()
   def inference(
     self,
-    condition, # (N, T, 2)
+    condition, # (1, T, 2)
     infer_len:int,
     cluster_top_k:int,
     track_top_k:int,
@@ -269,11 +269,11 @@ class FeatureClusterRecommender(nn.Module):
     next_cluster_probs = F.softmax(next_cluster_logits / temperature, dim=-1)
     top_cluster_values, top_cluster_indices = torch.topk(
       next_cluster_probs, 
-      k=min(self.num_clusters, cluster_top_k)
+      k=min(self.vocab.num_clusters, cluster_top_k)
     )
     
     top_clusters = [
-      self.unique_clusters[idx.item()] 
+      self.vocab.unique_clusters[idx.item()] 
       for idx in top_cluster_indices[0]
     ]
     top_probs = [
@@ -281,26 +281,25 @@ class FeatureClusterRecommender(nn.Module):
       for val in top_cluster_values[0]
     ]
     
-    # For each top cluster, find most similar songs
     recommendations = []
     
     for cluster_id, prob in zip(top_clusters, top_probs):
       # get tracks in the cluster
       if cluster_id in self.vocab.cluster_to_tracks:
-        cluster_tracks = self.cluster_to_songs[cluster_id]
+        cluster_tracks = self.vocab.cluster_to_tracks[cluster_id]
       else:
         continue
       
       if not cluster_tracks:
         continue
       
-      track_indices= [ self.vocab.idx_to_cluster[t_uri] for t_uri in cluster_tracks ]
+      track_indices = [ self.vocab.track_to_position[t_uri] for t_uri in cluster_tracks ]
       track_indices = torch.tensor(track_indices, dtype=torch.long, device=self.device)
-      cluster_track_embeddings = self.track_embedding(track_indices)
+      cluster_track_embeddings = self.position_in_cluster_embedding(track_indices)
       
       similarities = F.cosine_similarity(
-        next_track_embedding.unsqueeze(1), # 1, 1, d
-        cluster_track_embeddings.unsqueeze(0), # 1, ?, d
+        next_track_embedding.unsqueeze(1), # 1, 1, d//2
+        cluster_track_embeddings.unsqueeze(0), # 1, 1, d//2
         dim=2
       )[0]
       
