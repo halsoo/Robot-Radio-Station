@@ -11,7 +11,8 @@ python3 train.py \
   train_params.num_iter_per_inference=30000 \
   train_params.num_iter_per_checkpoint=30000 \
   train_params.max_length=50 \
-  inference_params.num_inference=100 \
+  inference_params.num_inference=10 \
+  inferece_params.infer_length=100 \
   inference_params.sampling.method=argmax \
   inference_params.sampling.temperature=1.5 \
   general.log=true \

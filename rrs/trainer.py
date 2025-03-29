@@ -520,15 +520,16 @@ class ClusterEncoderTrainer:
 
   @torch.inference_mode()
   def inference_and_log(self, n_iter):
+    num_infer = self.config.inference_params.num_inference
     infer_len = self.config.inference_params.infer_length
-    infer_set = Subset(self.valid_set, range(infer_len))
+    infer_set = Subset(self.valid_set, range(num_infer))
     
     start_time = time.time()
     
     total_pred = []
     total_gt = []
     
-    for i in range(infer_len):
+    for i in range(num_infer):
       cond, gt = infer_set[i]
       
       predictions = self.model.inference(

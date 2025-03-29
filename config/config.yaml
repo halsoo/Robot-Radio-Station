@@ -31,7 +31,7 @@ train_params:
 
 inference_params:
   num_inference: 5
-  infer_length: 5
+  infer_length: 100
   condition_length: 10
   sampling:
     method: top_p # "top_p", "typical", "eta", "argmax" or None
