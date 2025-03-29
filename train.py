@@ -74,6 +74,14 @@ def prepare_trainer(config, wandb_run, save_dir):
 
   max_length = config.train_params.max_length
   
+  if data_config.vocab.name == 'ClusterVocab':
+    track_to_cluster = torch.load('./data/track_to_cluster.pt')
+    cluster_to_track = torch.load('./data/cluster_to_track.pt')
+    vocab = getattr(data_utils, data_config.vocab.name)(
+      track_to_cluster,
+      cluster_to_track,
+    )
+  
   dataset = getattr(data_utils, data_config.dataset)(
     data_path=data_config.data_path,
     max_length=max_length,
@@ -120,7 +128,7 @@ def prepare_trainer(config, wandb_run, save_dir):
   else:
     scheduler = None
   
-  return trainer.DecoderOnlyTrainer(
+  return trainer.ClusterEncoderTrainer(
     model=model,
     optimizer=optimizer,
     scheduler=scheduler,

@@ -1,0 +1,5 @@
+net: FeatureClusterRecommender
+dim: 128
+depth: 4
+heads: 8
+dropout: 0.2

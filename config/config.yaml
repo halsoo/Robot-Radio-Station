@@ -14,7 +14,7 @@ train_params:
   num_iter_per_inference: 30000
   num_iter_per_checkpoint: 30000
   
-  max_length: 30
+  max_length: 50
 
   grad_clip: 1.0
 

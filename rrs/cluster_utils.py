@@ -1,12 +1,13 @@
 import os
 from collections import defaultdict, Counter
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 import numpy as np
 
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, MiniBatchKMeans
 from sklearn.decomposition import TruncatedSVD
+from sklearn.impute import SimpleImputer, KNNImputer
 from sklearn.preprocessing import StandardScaler
 from scipy.sparse import csr_matrix
 
@@ -29,43 +30,43 @@ def get_average_embedding(text, word_vectors):
 
 def extract_feature_views(playlists:list, uniq_tracks:list, word_vectors):
   """
-  - Audio view: audio features from Essentia
-  - Metadata view: artist, album, track, duration
-  - Playlist view: co-occurrence patterns
+  - audio: audio features from Essentia
+  - metadata: artist, album, track, duration, popularities
+  - playlist: co-occurrence patterns
   """
   audio_features = {}
   metadata_features = {}
   playlist_features = {}
   
-  for d in uniq_tracks:
+  for d in tqdm(uniq_tracks):
     track_uri, artist, album, track, yt_id, yt_title, duration_seconds, score, acousticness, danceability, speechiness, instrumentalness, key, liveness, loudness, mode, tempo, valence, artist_popularity, album_popularity, track_popularity = d
     
     audio_features[track_uri] = {
-      'acousticness': acousticness,
-      'danceability': danceability,
-      'speechiness': speechiness,
-      'instrumentalness': instrumentalness,
-      'key': key,
-      'liveness': liveness,
-      'loudness': loudness,
-      'mode': mode,
-      'tempo': tempo,
-      'valence': valence,
+      'acousticness': float(acousticness) if float(acousticness) >= 0 else np.nan,
+      'danceability': float(danceability) if float(danceability) >= 0 else np.nan,
+      'speechiness': float(speechiness) if float(speechiness) >= 0 else np.nan,
+      'instrumentalness': float(instrumentalness) if float(instrumentalness) >= 0 else np.nan,
+      'key': float(key),
+      'liveness': float(liveness) if float(liveness) >= 0 else np.nan,
+      'loudness': float(loudness) if loudness != '' else np.nan,
+      'mode': float(mode) if float(mode) >= 0 else np.nan,
+      'tempo': float(tempo) if float(tempo) >= 0 else np.nan,
+      'valence': float(valence) if float(valence) >= 0 else np.nan,
     }
     
     metadata_features[track_uri] = {
       'artist': get_average_embedding(artist, word_vectors),
       'album': get_average_embedding(album, word_vectors),
       'track': get_average_embedding(track, word_vectors),
-      'duration': duration_seconds,
-      'artist_popularity': artist_popularity, 
-      'album_popularity': album_popularity, 
-      'track_popularity': track_popularity,
+      'duration': float(duration_seconds),
+      'artist_popularity': float(artist_popularity), 
+      'album_popularity': float(album_popularity), 
+      'track_popularity': float(track_popularity),
     }
   
   song_to_playlists = defaultdict(set)
   
-  for pl_i, pl in enumerate(playlists):
+  for pl_i, pl in enumerate(tqdm(playlists)):
     for t in pl['tracks']:
       track_uri = t['track_uri']
       song_to_playlists[track_uri].add(pl_i)
@@ -110,7 +111,7 @@ def extract_feature_views(playlists:list, uniq_tracks:list, word_vectors):
 
 
 
-def prepare_feature_matrix(feature_dict):
+def prepare_feature_matrix(feature_dict, imputer='simple', is_metadata=False):
   # feature_dict => matrix
   # all feature vectors have must have the same dimensions
   
@@ -119,7 +120,7 @@ def prepare_feature_matrix(feature_dict):
   
   # all unique keys
   all_keys = set()
-  for features in feature_dict.values():
+  for features in tqdm(feature_dict.values()):
     all_keys.update(features.keys())
   
   all_keys = sorted(list(all_keys))
@@ -128,26 +129,92 @@ def prepare_feature_matrix(feature_dict):
   feature_matrix = []
   track_uri_list = []
   
-  for track_uri, features in feature_dict.items():
-    vector = [ features.get(key, 0.0) for key in all_keys ]
+  for track_uri, features in tqdm(feature_dict.items()):
+    if is_metadata:
+      vector = []
+      vector += features['artist'].tolist() # word vector
+      vector += features['album'].tolist() # word vector
+      vector += features['track'].tolist() # word vector
+      vector += [
+        features['duration'], # scalar
+        features['artist_popularity'], # scalar
+        features['album_popularity'], # scalar
+        features['track_popularity'] # scalar
+      ]
+    
+    else:
+      vector = [ features.get(key, np.nan) for key in all_keys ]
+    
     feature_matrix.append(vector)
     track_uri_list.append(track_uri)
   
-  return np.array(feature_matrix), all_keys
-
-
-
-def fit_clustering_model(ids, feature_matrix, feature_keys, num_clusters):
-  scaler = StandardScaler()
-  scaled_features = scaler.fit_transform(feature_matrix)
+  feature_matrix = np.array(feature_matrix)
   
-  n_clusters = min(num_clusters, len(ids))
-  clustering = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-  labels = clustering.fit_predict(scaled_features)
+  # apply imputation for np.nan
+  if np.isnan(feature_matrix).any():
+    if imputer == 'simple':
+      imputer = SimpleImputer(strategy='mean')  # or 'median', 'most_frequent', 'constant'
+      feature_matrix = imputer.fit_transform(feature_matrix)
+    
+    elif imputer == 'knn':
+      imputer = KNNImputer(n_neighbors=5)
+      feature_matrix = imputer.fit_transform(feature_matrix)
+  
+  return feature_matrix, all_keys
+
+
+
+def fit_clustering_model(track_ids, feature_matrix, feature_keys, num_clusters, use_minibatch=True, is_metadata=False):
+  if is_metadata:
+    embeddings = feature_matrix[:, :192]  # 3 embeddings of 64 dims each
+    scalars = feature_matrix[:, 192:]     # 4 scalar features
+  
+    scaler = StandardScaler()
+    scaled_scalars = scaler.fit_transform(scalars)
+    
+    scaled_features = np.hstack((embeddings, scaled_scalars))
+    
+  else:
+    scaler = StandardScaler()
+    scaled_features = scaler.fit_transform(feature_matrix)
+  
+  if use_minibatch:
+    n_clusters = min(num_clusters, len(track_ids))
+      
+    mini_kmeans = MiniBatchKMeans(
+      n_clusters=n_clusters, 
+      batch_size=25000, 
+      max_iter=100,
+      init='k-means++', 
+      n_init=3,  
+      init_size=2000*3,
+      random_state=42, 
+    )
+    mini_kmeans.fit(scaled_features)
+
+    clustering = KMeans(
+      n_clusters=n_clusters, 
+      init=mini_kmeans.cluster_centers_, 
+      n_init=1, 
+      max_iter=30, 
+      random_state=42,
+    )
+    labels = clustering.fit_predict(scaled_features)
+  
+  else:
+    n_clusters = min(num_clusters, 1000)
+    
+    clustering = KMeans(
+      n_clusters=n_clusters, 
+      init='k-means++', 
+      n_init=10, 
+      random_state=42,
+    )
+    labels = clustering.fit_predict(scaled_features)
   
   clusters = {
     t_id: int(label) 
-    for t_id, label in zip(ids, labels)
+    for t_id, label in zip(track_ids, labels)
   }
   
   return (

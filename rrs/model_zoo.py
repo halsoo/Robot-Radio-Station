@@ -256,28 +256,15 @@ class FeatureClusterRecommender(nn.Module):
   @torch.inference_mode()
   def inference(
     self,
-    condition:list,
+    condition, # (N, T, 2)
     infer_len:int,
     cluster_top_k:int,
     track_top_k:int,
     temperature=1,
     manual_seed=-1
   ):
-    encoded_condition = [
-      torch.tensor(
-        [
-          self.vocab.cluster_to_idx[
-            self.vocab.track_to_cluster[track_uri]
-          ],
-          self.track_to_position[track_uri]
-        ], 
-        dtype=torch.long, device=self.device
-      ) 
-      for track_uri in condition
-    ]
-    
     with torch.no_grad():
-      next_cluster_logits, next_track_embedding = self.forward(encoded_condition)
+      next_cluster_logits, next_track_embedding = self.forward(condition)
     
     next_cluster_probs = F.softmax(next_cluster_logits / temperature, dim=-1)
     top_cluster_values, top_cluster_indices = torch.topk(
@@ -319,12 +306,12 @@ class FeatureClusterRecommender(nn.Module):
       
       weighted_similarities = similarities * prob
       
-      num_to_get = min(track_top_k, len(cluster_songs))
+      num_to_get = min(track_top_k, len(cluster_tracks))
       if num_to_get > 0:
         top_track_values, top_track_indices = torch.topk(weighted_similarities, k=num_to_get)
         
         for idx, val in zip(top_track_indices, top_track_values):
-          track_uri = cluster_songs[idx.item()]
+          track_uri = cluster_tracks[idx.item()]
           score = val.item()
           recommendations.append((track_uri, score))
     
