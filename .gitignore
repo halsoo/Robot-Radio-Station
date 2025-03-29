@@ -1,5 +1,6 @@
 notebooks_local/
 data/
+!config/data/
 tmp/
 
 test/

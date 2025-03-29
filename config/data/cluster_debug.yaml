@@ -1,0 +1,7 @@
+data_path: ./metadata/cluster_debug
+
+dataset: SMPClusterDatasetMaker
+
+context_length: 20
+vocab:
+  name: 'ClusterVocab'
