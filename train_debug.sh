@@ -3,8 +3,10 @@ export CUDA_LAUNCH_BLOCKING=1
 python3 train.py \
   data=cluster_debug \
   nn_params=cluster_encoder \
+  nn_params.dim=512 \
+  nn_params.depth=8 \
   train_params.device='cuda' \
-  train_params.batch_size=36 \
+  train_params.batch_size=512 \
   train_params.num_iter=1000 \
   train_params.num_iter_per_train_log=10 \
   train_params.num_iter_per_validation=500 \
@@ -13,6 +15,7 @@ python3 train.py \
   train_params.max_length=50 \
   inference_params.num_inference=3 \
   inference_params.sampling.method=argmax \
+  inference_params.sampling.temperature=1.5 \
   general.debug=true \
   general.log=false \
   general.infer=true

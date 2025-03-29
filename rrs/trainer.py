@@ -470,7 +470,7 @@ class ClusterEncoderTrainer:
 
     else:
       cluster_logits, track_emb = self.model(seq)
-      cluster_loss = F.cross_entropy(cluster_logits, tgt[:, 0])
+      cluster_loss = F.cross_entropy(cluster_logits, tgt[:, 0], label_smoothing=self.config.train_params.label_smoothing)
       
       target_embedding = self.model.position_in_cluster_embedding(tgt[:, 1])
       track_similarity_loss = 1.0 - F.cosine_similarity(track_emb, target_embedding).mean()
@@ -534,8 +534,9 @@ class ClusterEncoderTrainer:
       predictions = self.model.inference(
         condition=torch.tensor(cond).unsqueeze(0).to(self.device),
         infer_len=infer_len,
-        cluster_top_k=10,
-        track_top_k=10
+        cluster_top_k=100,
+        track_top_k=10,
+        temperature=self.config.inference_params.sampling.temperature,
       )
       total_pred.append(predictions)
       
