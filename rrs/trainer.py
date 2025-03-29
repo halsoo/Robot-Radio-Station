@@ -547,6 +547,8 @@ class ClusterEncoderTrainer:
     total_hit_rate = 0.0
     
     for pred, gt in zip(total_pred, total_gt):
+      len_gt = len(gt)
+
       pred = set([
         uri
         for uri, _ in pred
@@ -557,7 +559,7 @@ class ClusterEncoderTrainer:
       ])
       
       hit_cnt = len(pred & gt)
-      hit_rate = hit_cnt / infer_len
+      hit_rate = hit_cnt / len_gt
       
       total_hit_count += hit_cnt
       total_hit_rate += hit_rate
