@@ -462,7 +462,7 @@ class ClusterEncoderTrainer:
     if self.use_fp16:
       with torch.cuda.amp.autocast(dtype=torch.float16):
         cluster_logits, track_emb = self.model(seq)
-        cluster_loss = F.cross_entropy(cluster_logits, tgt[:, 0, 0])
+        cluster_loss = F.cross_entropy(cluster_logits, tgt[:, 0, 0], label_smoothing=self.config.train_params.label_smoothing)
         
         target_embedding = self.model.position_in_cluster_embedding(tgt[:,0, 1].unsqueeze(-1))
         track_similarity_loss = 1.0 - F.cosine_similarity(track_emb, target_embedding).mean()

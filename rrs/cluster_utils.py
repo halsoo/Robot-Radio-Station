@@ -357,12 +357,10 @@ def estimate_new_song_popularity(
 ):
   # default values
   estimated_features = {
-    'song_popularity': 0.01, 
     'artist_popularity': 0.0,
     'album_popularity': 0.0,
-    'combined_popularity': 0.01
+    'track_popularity': 0.01, 
   }
-  
   
   if 'artist' in new_song_metadata:
     artist = new_song_metadata['artist']
@@ -379,13 +377,6 @@ def estimate_new_song_popularity(
         for t in artist_tracks
       ])  
       estimated_features['artist_popularity'] = avg_artist_pop
-      
-      # Update combined popularity
-      estimated_features['combined_popularity'] = (
-        estimated_features['song_popularity'] * 0.5 +
-        avg_artist_pop * 0.3 + 
-        estimated_features['album_popularity'] * 0.2
-      )
   
   return estimated_features
 
@@ -409,9 +400,10 @@ def assign_new_song_to_cluster(
     feature_keys = view_models['audio']['feature_keys']
     
     vector = [
-      new_audio_feature.get(key, 0.0) 
+      new_audio_feature.get(key, np.nan) 
       for key in feature_keys
     ]
+    
     scaled_vector = audio_scaler.transform([vector])
     
     audio_cluster = int(audio_model.predict(scaled_vector)[0])
@@ -423,13 +415,23 @@ def assign_new_song_to_cluster(
     metadata_scaler = view_models['metadata']['scaler']
     feature_keys = view_models['metadata']['feature_keys']
     
-    vector = [
-      new_metadata_feature.get(key, 0.0)
-      for key in feature_keys
+    vector = []
+    vector += new_metadata_feature['artist'].tolist() # word vector
+    vector += new_metadata_feature['album'].tolist() # word vector
+    vector += new_metadata_feature['track'].tolist() # word vector
+    vector += [
+      new_metadata_feature['duration'], # scalar
+      new_metadata_feature['artist_popularity'], # scalar
+      new_metadata_feature['album_popularity'], # scalar
+      new_metadata_feature['track_popularity'] # scalar
     ]
-    scaled_vector = metadata_scaler.transform([vector])
     
-    metadata_cluster = int(metadata_model.predict(scaled_vector)[0])
+    embeddings = vector[:192]  # 3 embeddings of 64 dims each
+    scalars = vector[192:]     # 4 scalar features
+    scaled_scalars = metadata_scaler.fit_transform([scalars])
+    scaled_vector = np.concatenate((embeddings, scaled_scalars[0]), axis =0)
+    
+    metadata_cluster = int(metadata_model.predict([scaled_vector])[0])
     view_assignments['metadata'] = metadata_cluster
   
   
@@ -483,7 +485,7 @@ def assign_new_song_to_cluster(
     
     final_cluster = combined_cluster
   
-    
+  
   # audio only
   elif 'audio' in view_assignments:
     audio_cluster = view_assignments['audio']
@@ -538,7 +540,7 @@ def assign_new_song_to_cluster(
     combined_features.update(metadata_features)
   
   # Add to vocabulary using similarity-based position
-  position = vocab.add_new_song_by_similarity(
+  position = vocab.add_new_song(
     new_track_uri, final_cluster, combined_features, combined_feature_dict
   )
   
